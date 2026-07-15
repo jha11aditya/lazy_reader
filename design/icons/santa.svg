@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- "Lazy Santa" — Santa tucked in bed, reading his phone propped on a bottle.
+       No transforms/clip-paths: ImageMagick's SVG renderer mishandles them;
+       rounded corners are applied afterwards with a raster mask. -->
+  <rect width="512" height="512" fill="#1B1B2F"/>
+
+  <!-- night sky stars -->
+  <circle cx="96" cy="110" r="7" fill="#F2B183" opacity="0.9"/>
+  <circle cx="180" cy="70" r="5" fill="#F2B183" opacity="0.6"/>
+  <circle cx="300" cy="96" r="6" fill="#F2B183" opacity="0.75"/>
+  <circle cx="404" cy="66" r="5" fill="#F2B183" opacity="0.55"/>
+  <circle cx="452" cy="130" r="4" fill="#F2B183" opacity="0.5"/>
+  <circle cx="60" cy="200" r="4" fill="#F2B183" opacity="0.45"/>
+
+  <!-- pillow -->
+  <ellipse cx="140" cy="310" rx="105" ry="60" fill="#FAF4EA"/>
+
+  <!-- head (seen from behind-left) -->
+  <circle cx="205" cy="270" r="54" fill="#F0C8A0"/>
+  <!-- ear -->
+  <circle cx="230" cy="282" r="11" fill="#E2B189"/>
+  <!-- beard at the far cheek -->
+  <circle cx="250" cy="298" r="24" fill="#FFFFFF"/>
+  <circle cx="230" cy="312" r="17" fill="#FFFFFF"/>
+
+  <!-- hat: red dome -->
+  <path d="M 149,260 C 147,202 223,176 265,222 C 269,230 265,242 259,248 L 155,284 Z" fill="#D64545"/>
+  <!-- hat droop + pom -->
+  <path d="M 175,204 C 145,186 115,200 109,234 L 133,244 C 139,220 157,212 181,218 Z" fill="#D64545"/>
+  <circle cx="117" cy="246" r="17" fill="#FFFFFF"/>
+  <!-- hat brim -->
+  <path d="M 145,256 L 261,230 L 269,252 L 153,280 Z" fill="#FFFFFF"/>
+
+  <!-- water bottle (phone leans on it) -->
+  <rect x="430" y="196" width="36" height="120" rx="12" fill="#C6DCEA"/>
+  <rect x="437" y="178" width="22" height="20" rx="5" fill="#9FBCCD"/>
+
+  <!-- phone: tilted quad, glowing screen with text -->
+  <polygon points="340,350 418,336 452,206 374,220" fill="#33334D" transform="none"/>
+  <polygon points="352,336 406,326 436,224 382,234" fill="#F2B183"/>
+  <path d="M 372,262 L 414,254" stroke="#1B1B2F" stroke-width="7" stroke-linecap="round" opacity="0.6"/>
+  <path d="M 368,282 L 410,274" stroke="#1B1B2F" stroke-width="7" stroke-linecap="round" opacity="0.6"/>
+  <path d="M 364,302 L 406,294" stroke="#1B1B2F" stroke-width="7" stroke-linecap="round" opacity="0.6"/>
+  <path d="M 360,322 L 388,317" stroke="#1B1B2F" stroke-width="7" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- blanket tucked to the chin -->
+  <path d="M 0,372 C 90,336 160,348 226,334 C 308,318 400,334 512,344 L 512,512 L 0,512 Z" fill="#F2E9DC"/>
+  <!-- blanket folds (filled slivers; stroked curves render unreliably) -->
+  <path d="M 110,428 C 175,404 250,408 316,392 L 316,402 C 250,418 175,414 110,438 Z" fill="#D9CAB2"/>
+  <path d="M 210,478 C 285,456 360,458 436,436 L 436,446 C 360,468 285,466 210,488 Z" fill="#D9CAB2"/>
+</svg>

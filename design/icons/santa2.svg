@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- "Lazy Santa" v2 — faithful to the user's reference: headboard top-left,
+       Santa's head seen from behind on the pillow, hat drooping left with pom,
+       beard curls at the ear, blanket sweeping the lower-right with folds,
+       phone with text leaning against a water bottle on the bed. -->
+  <defs>
+    <style>
+      .ln { stroke: #1B1B2F; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+  </defs>
+
+  <rect width="512" height="512" rx="96" fill="#F2E9DC"/>
+
+  <!-- headboard -->
+  <polygon points="75,180 330,100 342,228 88,305" class="ln" fill="#EADFCB"/>
+
+  <!-- bed surface edge, passing behind the bottle and phone -->
+  <path d="M 342,228 C 410,258 470,292 508,318" class="ln" fill="none"/>
+
+  <!-- pillow -->
+  <path d="M 78,335 C 120,302 212,292 264,308 C 288,316 292,348 276,372 C 232,408 132,420 94,402 C 72,392 64,356 78,335 Z" class="ln" fill="#FAF4EA"/>
+
+  <!-- head from behind -->
+  <circle cx="218" cy="322" r="50" class="ln" fill="#F0C8A0"/>
+  <!-- beard curls at the ear -->
+  <circle cx="254" cy="352" r="17" class="ln" fill="#FFFFFF"/>
+  <circle cx="266" cy="330" r="12" class="ln" fill="#FFFFFF"/>
+  <circle cx="242" cy="368" r="12" class="ln" fill="#FFFFFF"/>
+
+  <!-- hat tail drooping left onto the pillow, tapering to the pom -->
+  <path d="M 182,278 C 150,258 116,270 100,298 C 116,304 136,300 152,304 C 162,306 172,310 180,314 Z" class="ln" fill="#D64545"/>
+  <!-- hat dome capping the head -->
+  <path d="M 172,296 C 176,242 262,232 276,286 L 278,300 L 174,316 Z" class="ln" fill="#D64545"/>
+  <!-- brim hugging the dome's lower edge -->
+  <polygon points="168,300 276,282 282,308 174,326" class="ln" fill="#FFFFFF"/>
+  <!-- pom resting on the pillow -->
+  <circle cx="96" cy="308" r="16" class="ln" fill="#FFFFFF"/>
+
+  <!-- water bottle -->
+  <rect x="414" y="172" width="44" height="132" rx="14" class="ln" fill="#FFFFFF"/>
+  <rect x="424" y="144" width="24" height="30" rx="5" class="ln" fill="#FFFFFF"/>
+  <path d="M 418,214 L 454,214" class="ln" stroke-width="6"/>
+  <path d="M 418,262 L 454,262" class="ln" stroke-width="6"/>
+
+  <!-- phone leaning against the bottle -->
+  <polygon points="356,334 420,322 416,196 352,208" class="ln" fill="#33334D"/>
+  <polygon points="363,322 411,313 408,210 360,219" fill="#F2B183"/>
+  <g stroke="#1B1B2F" stroke-width="4" stroke-linecap="round" opacity="0.7">
+    <path d="M 368,232 L 402,226"/>
+    <path d="M 369,248 L 403,242"/>
+    <path d="M 370,264 L 404,258"/>
+    <path d="M 371,280 L 405,274"/>
+    <path d="M 372,296 L 396,292"/>
+  </g>
+
+  <!-- blanket over the body, up to the chin, sweeping lower-right -->
+  <path d="M 28,428 C 90,396 150,416 204,398 C 244,384 258,372 288,364 C 340,350 408,362 512,336 L 512,512 L 28,512 Z" class="ln" fill="#F7EFE2"/>
+  <!-- body mound under the blanket -->
+  <path d="M 288,364 C 310,396 330,412 362,424" class="ln" fill="none" stroke-width="7"/>
+  <!-- folds -->
+  <path d="M 140,466 C 200,444 252,454 300,436" class="ln" fill="none" stroke-width="7"/>
+  <path d="M 250,498 C 320,476 372,482 430,458" class="ln" fill="none" stroke-width="7"/>
+  <path d="M 386,404 C 420,392 450,394 478,384" class="ln" fill="none" stroke-width="7"/>
+</svg>

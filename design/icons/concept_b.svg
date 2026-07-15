@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Concept B: "Waveform Cover" — closed book, voice waveform on the cover, amber background -->
+  <rect width="512" height="512" rx="96" fill="#E8935C"/>
+  <!-- book cover -->
+  <rect x="136" y="104" width="240" height="304" rx="28" fill="#1B1B2F"/>
+  <!-- spine highlight -->
+  <rect x="136" y="104" width="26" height="304" rx="13" fill="#33334D"/>
+  <!-- bookmark ribbon -->
+  <path d="M 318,104 L 318,196 L 344,172 L 370,196 L 370,104 Z" fill="#F2B183"/>
+  <!-- voice waveform bars -->
+  <rect x="196" y="238" width="18" height="52" rx="9" fill="#F2E9DC"/>
+  <rect x="228" y="212" width="18" height="104" rx="9" fill="#F2E9DC"/>
+  <rect x="260" y="188" width="18" height="152" rx="9" fill="#F2E9DC"/>
+  <rect x="292" y="212" width="18" height="104" rx="9" fill="#F2E9DC"/>
+  <rect x="324" y="238" width="18" height="52" rx="9" fill="#F2E9DC"/>
+</svg>

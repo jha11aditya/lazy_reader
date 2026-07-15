@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Concept C: "Lazy Z Book" — cream background, open book whose voice arcs form a subtle lazy/cozy feel with a Z -->
+  <rect width="512" height="512" rx="96" fill="#F2E9DC"/>
+  <!-- open book -->
+  <path d="M 256,270 C 213,250 161,246 112,257 L 112,372 C 161,361 213,365 256,385 Z" fill="#1B1B2F"/>
+  <path d="M 256,270 C 299,250 351,246 400,257 L 400,372 C 351,361 299,365 256,385 Z" fill="#1B1B2F"/>
+  <path d="M 256,270 L 256,385" stroke="#F2E9DC" stroke-width="8"/>
+  <!-- page hint lines -->
+  <path d="M 142,282 C 178,276 214,278 238,288" fill="none" stroke="#E8935C" stroke-width="9" stroke-linecap="round"/>
+  <path d="M 142,314 C 178,308 214,310 238,320" fill="none" stroke="#E8935C" stroke-width="9" stroke-linecap="round"/>
+  <path d="M 274,288 C 298,278 334,276 370,282" fill="none" stroke="#E8935C" stroke-width="9" stroke-linecap="round"/>
+  <path d="M 274,320 C 298,310 334,308 370,314" fill="none" stroke="#E8935C" stroke-width="9" stroke-linecap="round"/>
+  <!-- sleepy Zs rising like voice -->
+  <g fill="#E8935C">
+    <path d="M 232,196 L 288,196 L 288,180 L 258,180 L 288,140 L 232,140 L 232,156 L 262,156 Z"/>
+    <path d="M 306,148 L 346,148 L 346,136 L 326,136 L 346,108 L 306,108 L 306,120 L 326,120 Z" opacity="0.7"/>
+    <path d="M 356,106 L 384,106 L 384,96 L 371,96 L 384,76 L 356,76 L 356,86 L 369,86 Z" opacity="0.45"/>
+  </g>
+</svg>

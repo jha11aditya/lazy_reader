@@ -1,0 +1,17 @@
+*.iml
+.gradle/
+.kotlin/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+/app/build/
+
+# Training data & artifacts (3.5GB — dataset, extracted corpus, TF Hub cache).
+# The shipped model is committed at app/src/main/assets/voice_commands.tflite.
+/training/data/
+/.claude/
