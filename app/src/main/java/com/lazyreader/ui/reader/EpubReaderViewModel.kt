@@ -126,7 +126,7 @@ class EpubReaderViewModel(application: Application) : AndroidViewModel(applicati
         _uiState.update { it.copy(locked = false) }
     }
 
-    private fun onVoiceCommand(command: VoiceCommand) {
+    internal fun onVoiceCommand(command: VoiceCommand) {
         when (command) {
             VoiceCommand.GO -> _pageDeltas.tryEmit(+1)
             VoiceCommand.BACKWARD -> _pageDeltas.tryEmit(-1)

@@ -5,6 +5,7 @@ import android.net.Uri
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,6 +26,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,6 +39,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Reflowable EPUB reader: each spine chapter is loaded into a WebView and
@@ -68,6 +73,11 @@ fun EpubReaderScreen(
 
     var pageInChapter by remember { mutableIntStateOf(0) }
     var pagesInChapter by remember { mutableIntStateOf(1) }
+    // Covers the WebView with a spinner until PAGINATE_JS has run: without
+    // it, bigger chapters visibly flash their unstyled (wide, unpaginated)
+    // layout for the ~100ms+ it takes the pagination CSS to apply and the
+    // engine to reflow, then snap to the correct narrow columned view.
+    var isPaginated by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val webView = remember {
@@ -75,10 +85,16 @@ fun EpubReaderScreen(
         WebView(context).apply {
             settings.javaScriptEnabled = true
             settings.allowFileAccess = true
-            // true so the injected viewport meta (see onPageFinished) is honored:
-            // EPUB chapters ship without one, and the fallback desktop-width
-            // layout (~1216 CSS px here) gets scale-fitted — text misframed.
-            settings.useWideViewPort = true
+            // false, not true: per WebSettings docs this makes layout width
+            // ALWAYS equal the real device width in CSS px, regardless of any
+            // viewport meta tag. EPUB chapters ship with no viewport meta, so
+            // useWideViewPort=true fell back to a wide (~1216 CSS px) desktop
+            // layout that a JS-injected meta tag was supposed to override —
+            // but injecting it after onPageFinished didn't reliably force a
+            // re-layout before PAGINATE_JS measured, producing pages many
+            // times wider than the screen (content ran off the right edge,
+            // "swipe" just panned across it instead of turning a page).
+            settings.useWideViewPort = false
             settings.loadWithOverviewMode = false
             // TEXT_AUTOSIZING (the default) inflates fonts after layout and
             // breaks the fixed column pagination math.
@@ -86,6 +102,16 @@ fun EpubReaderScreen(
             settings.textZoom = 100
             isHorizontalScrollBarEnabled = false
             isVerticalScrollBarEnabled = false
+            // Hiding the scrollbars above doesn't stop WebView's own native
+            // touch panning, which was fighting with the swipe gesture below
+            // (Compose's pointerInput.consume() doesn't block the AndroidView
+            // child's native touch dispatch) — the two combined into a small
+            // leftover scroll offset stacking with showPage()'s translateX,
+            // clipping a few characters off the page edge after each swipe.
+            // This is a read-only reflowable page, not a scrollable one, so
+            // fully absorbing touch here and leaving paging to that gesture
+            // detector alone is correct, not just a workaround.
+            setOnTouchListener { _, _ -> true }
         }
     }
 
@@ -116,14 +142,27 @@ fun EpubReaderScreen(
             }
 
             override fun onPageFinished(view: WebView, url: String) {
-                view.evaluateJavascript(VIEWPORT_META_JS, null)
-                // Give the engine a beat to relayout at device width before measuring.
+                // document.documentElement.clientHeight was found (via device
+                // logging) to report more than 2x the real WebView height here
+                // — clientWidth matched the real Android View width exactly,
+                // but height didn't, for reasons that weren't worth chasing
+                // further. Passing the real, Kotlin-measured pixel height in
+                // sidesteps whatever WebView-internal quirk was inflating it,
+                // which is what every CSS padding/height tweak was invisibly
+                // fighting: a ~2x-too-tall page swallows a 16-44px nudge.
+                // Give the engine a beat to settle layout before measuring —
+                // read view.height after that same delay, not before: at the
+                // instant onPageFinished fires, the Android View's own layout
+                // pass isn't guaranteed to have completed yet (most visible
+                // in a freshly-created host, e.g. a bare test Activity).
                 view.postDelayed({
-                    view.evaluateJavascript(PAGINATE_JS) { result ->
+                    val trustedHeightPx = (view.height / view.resources.displayMetrics.density).toInt()
+                    view.evaluateJavascript(buildPaginateJs(trustedHeightPx)) { result ->
                         val count = result?.trim('"')?.toIntOrNull() ?: 1
                         pagesInChapter = count.coerceAtLeast(1)
                         val target = if (viewModel.uiState.value.openAtLastPage) pagesInChapter - 1 else 0
                         showPage(target)
+                        isPaginated = true
                     }
                 }, 100)
             }
@@ -135,7 +174,17 @@ fun EpubReaderScreen(
         uiState.chapterUrl?.let { url ->
             pageInChapter = 0
             pagesInChapter = 1
-            webView.loadUrl(url)
+            isPaginated = false
+            // loadUrl() lets WebView infer the MIME type from the .xhtml
+            // extension, which parses it as strict application/xhtml+xml —
+            // in that mode a <style> element created and appended via JS is
+            // silently never registered as a stylesheet, so the column-width
+            // pagination CSS never applies. Explicitly loading as text/html
+            // forces the normal, lenient HTML parser instead. baseUrl stays
+            // the chapter's real file:// location so relative references
+            // (images etc.) still resolve correctly.
+            val html = withContext(Dispatchers.IO) { File(Uri.parse(url).path!!).readText() }
+            webView.loadDataWithBaseURL(url, html, "text/html", "UTF-8", null)
         }
     }
 
@@ -208,6 +257,17 @@ fun EpubReaderScreen(
                     ) {
                         AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
 
+                        if (!isPaginated) {
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.background),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        }
+
                         Surface(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
@@ -239,41 +299,54 @@ fun EpubReaderScreen(
  * viewport width — translateX(-page * vw) always lands on a page boundary.
  * Idempotent: re-running (e.g. after a repaint) returns the cached count.
  */
-/** Forces layout at real device width, scale 1 — EPUB chapters ship no viewport meta. */
-private val VIEWPORT_META_JS = """
-    (function() {
-      var d = document;
-      var m = d.querySelector('meta[name="viewport"]');
-      if (!m) {
-        m = d.createElement('meta');
-        m.setAttribute('name', 'viewport');
-        d.head.appendChild(m);
-      }
-      m.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-    })()
-""".trimIndent()
-
-private val PAGINATE_JS = """
+private fun buildPaginateJs(trustedHeightPx: Int): String = """
     (function() {
       if (window.__lrPageCount) return window.__lrPageCount;
       // Integer geometry throughout, based on the document's real layout
       // width (clientWidth) — innerWidth can disagree with it when WebView
       // applies a scale, which shows up as zoomed/clipped pages.
-      var d = document, pad = 24;
-      var vw = d.documentElement.clientWidth, vh = d.documentElement.clientHeight;
+      var d = document, pad = 24, topPad = 28, bottomPad = 100;
+      var vw = d.documentElement.clientWidth;
+      // NOT document.documentElement.clientHeight: on-device logging showed
+      // it reporting more than double the WebView's real pixel height here,
+      // while clientWidth matched perfectly — so height comes from Kotlin
+      // (the real Android View height / density) instead of trusting it.
+      var vh = $trustedHeightPx;
       var colw = vw - 2 * pad;
+      // column-fill:auto fills each column to exactly this element's height,
+      // and if that height isn't a whole multiple of line-height, the line
+      // straddling the boundary gets sliced in half by html's overflow:hidden
+      // (a known column-pagination issue, e.g. readium/swift-toolkit#804).
+      // Rounding down to the nearest full line avoids that: a small blank
+      // gap at the bottom beats a clipped line.
+      var fontSize = 19, lineHeight = fontSize * 1.6;
+      var rawContentH = vh - topPad - bottomPad;
+      var contentH = Math.max(lineHeight, Math.floor(rawContentH / lineHeight) * lineHeight);
+      var htmlH = contentH + topPad + bottomPad;
       var s = d.createElement('style');
       s.textContent =
         'html{margin:0 !important;box-sizing:border-box !important;' +
-        'width:' + vw + 'px !important;height:' + vh + 'px !important;' +
-        'padding:28px ' + pad + 'px 56px ' + pad + 'px !important;' +  // extra bottom: page indicator floats there
+        'width:' + vw + 'px !important;height:' + htmlH + 'px !important;' +
+        'padding:' + topPad + 'px ' + pad + 'px ' + bottomPad + 'px ' + pad + 'px !important;' +
         'overflow:hidden !important;}' +
         'body{margin:0 !important;padding:0 !important;' +
+        // overflow stays visible (not hidden) here: the columns MUST paint
+        // beyond body's own declared (one-column-wide) box for the multicol
+        // trick to work at all — html's overflow:hidden above is what clips
+        // the viewport to one page; hiding it here too clipped every column
+        // after the first, leaving later pages blank.
         'width:' + colw + 'px !important;height:100% !important;' +
         'column-width:' + colw + 'px;column-gap:' + (2 * pad) + 'px;column-fill:auto;' +
-        'font-size:19px;line-height:1.6;' +
+        'font-size:' + fontSize + 'px;line-height:1.6;' +
         'transition:transform 200ms ease;will-change:transform;}' +
-        'img,svg,video,table{max-width:' + colw + 'px !important;height:auto !important;}';
+        // break-inside:avoid is only a hint the engine can ignore when an
+        // image is simply taller than one page to begin with — capping
+        // max-height (alongside max-width, both with auto on the other
+        // axis so aspect ratio is preserved) guarantees it never is, which
+        // is what actually stops images being sliced across a page break.
+        'img,svg,video,table{max-width:' + colw + 'px !important;' +
+        'max-height:' + contentH + 'px !important;width:auto !important;height:auto !important;' +
+        'break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;}';
       d.head.appendChild(s);
       // Re-read after styling: scrollWidth reflects the new column layout.
       window.__lrPageCount = Math.max(1, Math.ceil(d.body.scrollWidth / vw));

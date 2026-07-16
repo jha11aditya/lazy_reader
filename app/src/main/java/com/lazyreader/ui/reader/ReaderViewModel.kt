@@ -42,6 +42,18 @@ data class ReaderUiState(
 private const val RENDER_WINDOW = 1
 private const val RENDER_SCALE = 2f
 
+/**
+ * Clamped voice-navigation target, or null if there's nothing to move to
+ * (no pages loaded yet, or the delta would land back on the current page).
+ * Pulled out of [ReaderViewModel.requestPageDelta] so the bounds math is
+ * unit-testable without a real PdfRenderer-backed page count.
+ */
+internal fun computeTargetPage(current: Int, pageCount: Int, delta: Int): Int? {
+    if (pageCount == 0) return null
+    val target = (current + delta).coerceIn(0, pageCount - 1)
+    return target.takeIf { it != current }
+}
+
 class ReaderViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = AppDatabase.getInstance(application).recentDocumentDao()
     private val renderMutex = Mutex()
@@ -170,7 +182,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update { it.copy(locked = false) }
     }
 
-    private fun onVoiceCommand(command: VoiceCommand) {
+    internal fun onVoiceCommand(command: VoiceCommand) {
         when (command) {
             VoiceCommand.GO -> requestPageDelta(+1)
             VoiceCommand.BACKWARD -> requestPageDelta(-1)
@@ -183,9 +195,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun requestPageDelta(delta: Int) {
         val state = _uiState.value
-        if (state.pageCount == 0) return
-        val target = (state.currentPage + delta).coerceIn(0, state.pageCount - 1)
-        if (target != state.currentPage) _pageRequests.tryEmit(target)
+        val target = computeTargetPage(state.currentPage, state.pageCount, delta) ?: return
+        _pageRequests.tryEmit(target)
     }
 
     private fun closeRendererLocked() {

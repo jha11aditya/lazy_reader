@@ -128,21 +128,32 @@ class VoiceCommandClassifier(
             ?: return
         Log.d(TAG, categories.joinToString { "${it.categoryName()}=%.2f".format(it.score()) })
         val top = categories.maxByOrNull { it.score() } ?: return
-        if (top.score() < SCORE_THRESHOLD) return
-        val command = when (top.categoryName()) {
-            "go" -> VoiceCommand.GO
-            "backward" -> VoiceCommand.BACKWARD
-            "stop" -> VoiceCommand.STOP
-            else -> return // background
-        }
-        // Overlapping windows re-detect the same utterance; suppress repeats.
         val now = SystemClock.uptimeMillis()
-        if (now - lastCommandAtMs < DEBOUNCE_MS) return
+        val command = decideCommand(top.categoryName(), top.score(), now, lastCommandAtMs) ?: return
         lastCommandAtMs = now
         mainHandler.post { onCommand(command) }
     }
 
-    private companion object {
+    internal companion object {
+        // Pulled out of onResult so it's unit-testable without a real MediaPipe
+        // AudioClassifierResult, which isn't constructible off-device.
+        internal fun decideCommand(
+            categoryName: String?,
+            score: Float,
+            nowMs: Long,
+            lastCommandAtMs: Long,
+        ): VoiceCommand? {
+            if (score < SCORE_THRESHOLD) return null
+            val command = when (categoryName) {
+                "go" -> VoiceCommand.GO
+                "backward" -> VoiceCommand.BACKWARD
+                "stop" -> VoiceCommand.STOP
+                else -> return null // background / unrecognized
+            }
+            if (nowMs - lastCommandAtMs < DEBOUNCE_MS) return null
+            return command
+        }
+
         const val TAG = "VoiceCommandClassifier"
         const val MODEL_ASSET = "voice_commands.tflite"
         const val SAMPLE_RATE = 16000
