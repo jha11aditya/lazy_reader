@@ -77,6 +77,10 @@ class EpubReaderViewModel(application: Application) : AndroidViewModel(applicati
                     chapterUrl = Uri.fromFile(parsed.chapterFiles[chapter]).toString(),
                     toc = parsed.toc,
                 )
+                // Bump lastOpenedAt on open, not just on chapter changes:
+                // reading within a single chapter persists nothing else, and
+                // the dashboard's recency sort keys off this timestamp.
+                persistProgress(chapter)
             } catch (e: Exception) {
                 openUri = null
                 _uiState.value = EpubReaderUiState(

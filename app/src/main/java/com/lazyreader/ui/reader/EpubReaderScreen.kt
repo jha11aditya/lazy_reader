@@ -83,8 +83,13 @@ fun EpubReaderScreen(
     // Content renders full-bleed (no Scaffold content inset) so the top bar
     // and bottom indicator can float on top and auto-hide/reappear without
     // resizing the WebView underneath — critical here, since the pagination
-    // math is keyed off the WebView's real measured height.
-    val (chromeVisible, pokeChrome) = rememberChromeVisibility()
+    // math is keyed off the WebView's real measured height. Two separate
+    // visibilities: page turns reveal only the bottom indicator (feedback
+    // that a voice command worked, positioned where it never covers the
+    // start of the text) — the header overlays exactly where reading
+    // begins, so it appears on tap only.
+    val (headerVisible, pokeHeader) = rememberChromeVisibility()
+    val (indicatorVisible, pokeIndicator) = rememberChromeVisibility()
     var showJumpDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -139,7 +144,8 @@ fun EpubReaderScreen(
                         if (kotlin.math.abs(event.x - downX) <= touchSlop &&
                             kotlin.math.abs(event.y - downY) <= touchSlop
                         ) {
-                            pokeChrome()
+                            pokeHeader()
+                            pokeIndicator()
                         }
                     }
                 }
@@ -160,12 +166,12 @@ fun EpubReaderScreen(
 
     fun goForward() {
         if (pageInChapter + 1 < pagesInChapter) showPage(pageInChapter + 1) else viewModel.nextChapter()
-        pokeChrome()
+        pokeIndicator()
     }
 
     fun goBackward() {
         if (pageInChapter > 0) showPage(pageInChapter - 1) else viewModel.previousChapter()
-        pokeChrome()
+        pokeIndicator()
     }
 
     // Configure client once; it re-paginates every time a chapter finishes loading.
@@ -299,7 +305,12 @@ fun EpubReaderScreen(
                                 },
                             )
                         }
-                        .pointerInput(Unit) { detectTapGestures(onTap = { pokeChrome() }) },
+                        .pointerInput(Unit) {
+                            detectTapGestures(onTap = {
+                                pokeHeader()
+                                pokeIndicator()
+                            })
+                        },
                 ) {
                     AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
 
@@ -315,7 +326,7 @@ fun EpubReaderScreen(
                     }
 
                     AnimatedVisibility(
-                        visible = chromeVisible,
+                        visible = headerVisible || indicatorVisible,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .padding(bottom = 16.dp),
@@ -360,11 +371,11 @@ fun EpubReaderScreen(
             }
         }
 
-        // Kept reachable during loading/error (not gated on chromeVisible
+        // Kept reachable during loading/error (not gated on headerVisible
         // alone) so the back button never auto-hides before the user has
         // had a chance to see it.
         AnimatedVisibility(
-            visible = chromeVisible || uiState.isLoading || uiState.errorMessage != null,
+            visible = headerVisible || uiState.isLoading || uiState.errorMessage != null,
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             TopAppBar(

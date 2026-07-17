@@ -65,8 +65,12 @@ fun ReaderScreen(
 
     // Content renders full-bleed (no Scaffold content inset) so the top bar
     // and bottom indicator can float on top and auto-hide/reappear without
-    // resizing the pager underneath.
-    val (chromeVisible, pokeChrome) = rememberChromeVisibility()
+    // resizing the pager underneath. Two separate visibilities: page turns
+    // reveal only the bottom indicator (feedback that the command worked,
+    // positioned where it never covers the start of the text) — the header
+    // overlays exactly where reading begins, so it appears on tap only.
+    val (headerVisible, pokeHeader) = rememberChromeVisibility()
+    val (indicatorVisible, pokeIndicator) = rememberChromeVisibility()
     var showJumpDialog by remember { mutableStateOf(false) }
 
     Box(modifier.fillMaxSize()) {
@@ -89,7 +93,7 @@ fun ReaderScreen(
                         .distinctUntilChanged()
                         .collect { page ->
                             viewModel.onPageChanged(page)
-                            pokeChrome()
+                            pokeIndicator()
                         }
                 }
 
@@ -102,7 +106,12 @@ fun ReaderScreen(
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .pointerInput(Unit) { detectTapGestures(onTap = { pokeChrome() }) },
+                        .pointerInput(Unit) {
+                            detectTapGestures(onTap = {
+                                pokeHeader()
+                                pokeIndicator()
+                            })
+                        },
                 ) {
                     HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceVariant) {
@@ -123,7 +132,7 @@ fun ReaderScreen(
                     }
 
                     AnimatedVisibility(
-                        visible = chromeVisible,
+                        visible = headerVisible || indicatorVisible,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .padding(bottom = 16.dp),
@@ -154,11 +163,11 @@ fun ReaderScreen(
             }
         }
 
-        // Kept reachable during loading/error (not gated on chromeVisible
+        // Kept reachable during loading/error (not gated on headerVisible
         // alone) so the back button never auto-hides before the user has
         // had a chance to see it.
         AnimatedVisibility(
-            visible = chromeVisible || uiState.isLoading || uiState.errorMessage != null,
+            visible = headerVisible || uiState.isLoading || uiState.errorMessage != null,
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             TopAppBar(

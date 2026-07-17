@@ -14,6 +14,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.lazyreader.data.RecentDocument
+import com.lazyreader.ui.about.AboutScreen
 import com.lazyreader.ui.dashboard.DashboardScreen
 import com.lazyreader.ui.dashboard.DashboardViewModel
 import com.lazyreader.ui.reader.EpubReaderScreen
@@ -45,7 +46,11 @@ fun LazyReaderApp() {
                     navController.navigate("reader/${Uri.encode(document.uri)}")
                 },
                 onDeleteClick = viewModel::deleteDocument,
+                onAboutClick = { navController.navigate("about") },
             )
+        }
+        composable("about") {
+            AboutScreen(onBack = { navController.popBackStack() })
         }
         composable(
             route = "reader/{uri}",
