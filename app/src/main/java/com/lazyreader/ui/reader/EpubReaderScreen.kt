@@ -5,8 +5,11 @@ import android.net.Uri
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -17,7 +20,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -78,6 +80,12 @@ fun EpubReaderScreen(
     // layout for the ~100ms+ it takes the pagination CSS to apply and the
     // engine to reflow, then snap to the correct narrow columned view.
     var isPaginated by remember { mutableStateOf(false) }
+    // Content renders full-bleed (no Scaffold content inset) so the top bar
+    // and bottom indicator can float on top and auto-hide/reappear without
+    // resizing the WebView underneath — critical here, since the pagination
+    // math is keyed off the WebView's real measured height.
+    val (chromeVisible, pokeChrome) = rememberChromeVisibility()
+    var showJumpDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val webView = remember {
@@ -109,9 +117,34 @@ fun EpubReaderScreen(
             // leftover scroll offset stacking with showPage()'s translateX,
             // clipping a few characters off the page edge after each swipe.
             // This is a read-only reflowable page, not a scrollable one, so
-            // fully absorbing touch here and leaving paging to that gesture
-            // detector alone is correct, not just a workaround.
-            setOnTouchListener { _, _ -> true }
+            // fully absorbing touch here and leaving paging to the Compose
+            // drag detector below is correct, not just a workaround.
+            //
+            // Taps, however, must be recognized HERE, not in a Compose
+            // detectTapGestures on the wrapping Box: because this listener
+            // absorbs everything, a plain tap is consumed at the child level
+            // and the parent's tap detector never fires (drags still work —
+            // they're recognized over a longer event stream that the parent
+            // drag detector claims before the child swallows it).
+            val touchSlop = android.view.ViewConfiguration.get(context).scaledTouchSlop
+            var downX = 0f
+            var downY = 0f
+            setOnTouchListener { _, event ->
+                when (event.actionMasked) {
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        downX = event.x
+                        downY = event.y
+                    }
+                    android.view.MotionEvent.ACTION_UP -> {
+                        if (kotlin.math.abs(event.x - downX) <= touchSlop &&
+                            kotlin.math.abs(event.y - downY) <= touchSlop
+                        ) {
+                            pokeChrome()
+                        }
+                    }
+                }
+                true
+            }
         }
     }
 
@@ -127,10 +160,12 @@ fun EpubReaderScreen(
 
     fun goForward() {
         if (pageInChapter + 1 < pagesInChapter) showPage(pageInChapter + 1) else viewModel.nextChapter()
+        pokeChrome()
     }
 
     fun goBackward() {
         if (pageInChapter > 0) showPage(pageInChapter - 1) else viewModel.previousChapter()
+        pokeChrome()
     }
 
     // Configure client once; it re-paginates every time a chapter finishes loading.
@@ -160,9 +195,21 @@ fun EpubReaderScreen(
                     view.evaluateJavascript(buildPaginateJs(trustedHeightPx)) { result ->
                         val count = result?.trim('"')?.toIntOrNull() ?: 1
                         pagesInChapter = count.coerceAtLeast(1)
-                        val target = if (viewModel.uiState.value.openAtLastPage) pagesInChapter - 1 else 0
-                        showPage(target)
-                        isPaginated = true
+                        val state = viewModel.uiState.value
+                        val anchor = state.pendingAnchor
+                        if (anchor != null) {
+                            // TOC jump into this file: land on the page holding
+                            // the anchor element, not the file's first page.
+                            view.evaluateJavascript(anchorPageJs(anchor, currentPage = 0)) { pageResult ->
+                                val page = pageResult?.trim('"')?.toIntOrNull() ?: 0
+                                showPage(page.coerceIn(0, pagesInChapter - 1))
+                                viewModel.clearPendingAnchor()
+                                isPaginated = true
+                            }
+                        } else {
+                            showPage(if (state.openAtLastPage) pagesInChapter - 1 else 0)
+                            isPaginated = true
+                        }
                     }
                 }, 100)
             }
@@ -194,85 +241,88 @@ fun EpubReaderScreen(
         }
     }
 
+    // TOC jump within the ALREADY-loaded chapter file: chapterUrl doesn't
+    // change, so no reload/onPageFinished fires — honor the anchor directly.
+    // Cross-file jumps arrive here with isPaginated=false and are skipped;
+    // the onPageFinished path above handles those after the reload.
+    LaunchedEffect(uiState.pendingAnchor) {
+        val anchor = uiState.pendingAnchor
+        if (anchor != null && isPaginated) {
+            webView.evaluateJavascript(anchorPageJs(anchor, currentPage = pageInChapter)) { pageResult ->
+                val page = pageResult?.trim('"')?.toIntOrNull() ?: 0
+                showPage(page.coerceIn(0, pagesInChapter - 1))
+                viewModel.clearPendingAnchor()
+            }
+        }
+    }
+
     Box(modifier.fillMaxSize()) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text(displayName, maxLines = 1) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+        when {
+            uiState.errorMessage != null -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        uiState.errorMessage.orEmpty(),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(24.dp),
+                    )
+                }
+            }
+            uiState.isLoading -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+            else -> {
+                // Swipe left/right to turn pages, matching the PDF pager feel;
+                // a plain tap reveals chrome instead. Both live in their own
+                // pointerInput block on the same Box — Compose gives each an
+                // independent copy of the event stream, so the drag detector
+                // (which only consumes once a real drag is recognized) and
+                // the tap detector coexist without stepping on each other.
+                val swipeThresholdPx = with(LocalDensity.current) { 60.dp.toPx() }
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .pointerInput(swipeThresholdPx) {
+                            var dragTotal = 0f
+                            detectHorizontalDragGestures(
+                                onDragStart = { dragTotal = 0f },
+                                onHorizontalDrag = { change, dragAmount ->
+                                    dragTotal += dragAmount
+                                    change.consume()
+                                },
+                                onDragEnd = {
+                                    when {
+                                        dragTotal <= -swipeThresholdPx -> goForward()
+                                        dragTotal >= swipeThresholdPx -> goBackward()
+                                    }
+                                },
+                            )
                         }
-                    },
-                    actions = {
-                        VoiceMicAction(
-                            voiceActive = uiState.voiceActive,
-                            onStartVoice = viewModel::startVoiceControl,
-                            onStopVoice = viewModel::stopVoiceControl,
-                        )
-                    },
-                )
-            },
-        ) { padding ->
-            when {
-                uiState.errorMessage != null -> {
-                    Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                        Text(
-                            uiState.errorMessage.orEmpty(),
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(24.dp),
-                        )
+                        .pointerInput(Unit) { detectTapGestures(onTap = { pokeChrome() }) },
+                ) {
+                    AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
+
+                    if (!isPaginated) {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.background),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator()
+                        }
                     }
-                }
-                uiState.isLoading -> {
-                    Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                }
-                else -> {
-                    // Swipe left/right to turn pages, matching the PDF pager feel.
-                    // The gesture overlay only consumes horizontal drags; plain
-                    // taps still fall through to the WebView underneath.
-                    val swipeThresholdPx = with(LocalDensity.current) { 60.dp.toPx() }
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .padding(padding)
-                            .pointerInput(swipeThresholdPx) {
-                                var dragTotal = 0f
-                                detectHorizontalDragGestures(
-                                    onDragStart = { dragTotal = 0f },
-                                    onHorizontalDrag = { change, dragAmount ->
-                                        dragTotal += dragAmount
-                                        change.consume()
-                                    },
-                                    onDragEnd = {
-                                        when {
-                                            dragTotal <= -swipeThresholdPx -> goForward()
-                                            dragTotal >= swipeThresholdPx -> goBackward()
-                                        }
-                                    },
-                                )
-                            },
+
+                    AnimatedVisibility(
+                        visible = chromeVisible,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 16.dp),
                     ) {
-                        AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
-
-                        if (!isPaginated) {
-                            Box(
-                                Modifier
-                                    .fillMaxSize()
-                                    .background(MaterialTheme.colorScheme.background),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                CircularProgressIndicator()
-                            }
-                        }
-
                         Surface(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 16.dp),
                             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                            modifier = Modifier.clickable { showJumpDialog = true },
                         ) {
                             Text(
                                 text = "Ch ${uiState.chapterIndex + 1}/${uiState.chapterCount}" +
@@ -283,13 +333,82 @@ fun EpubReaderScreen(
                         }
                     }
                 }
+
+                if (showJumpDialog) {
+                    val toc = uiState.toc
+                    if (toc.isNotEmpty()) {
+                        // Real chapters from the book's nav TOC. Spine files
+                        // often pack many actual chapters each (e.g. Project
+                        // Gutenberg), so a spine-based slider would show
+                        // "chapters" that don't match the book's own.
+                        TocDialog(
+                            titles = toc.map { it.title },
+                            onSelect = { index -> viewModel.jumpToTocEntry(toc[index]) },
+                            onDismiss = { showJumpDialog = false },
+                        )
+                    } else {
+                        JumpToDialog(
+                            title = "Jump to section",
+                            itemLabel = "Section",
+                            currentIndex = uiState.chapterIndex,
+                            totalCount = uiState.chapterCount,
+                            onJumpTo = viewModel::jumpToChapter,
+                            onDismiss = { showJumpDialog = false },
+                        )
+                    }
+                }
             }
+        }
+
+        // Kept reachable during loading/error (not gated on chromeVisible
+        // alone) so the back button never auto-hides before the user has
+        // had a chance to see it.
+        AnimatedVisibility(
+            visible = chromeVisible || uiState.isLoading || uiState.errorMessage != null,
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) {
+            TopAppBar(
+                title = { Text(displayName, maxLines = 1) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    VoiceMicAction(
+                        voiceActive = uiState.voiceActive,
+                        onStartVoice = viewModel::startVoiceControl,
+                        onStopVoice = viewModel::stopVoiceControl,
+                    )
+                },
+            )
         }
 
         if (uiState.locked) {
             LockOverlay(onUnlock = viewModel::unlock)
         }
     }
+}
+
+/**
+ * Which page (0-based column index) the element with id [anchor] sits on.
+ * getBoundingClientRect().left is relative to the CURRENT translated
+ * viewport, so the real column x is rect.left + currentPage * viewport
+ * width; dividing by the viewport width (the exact page stride — see
+ * [buildPaginateJs] geometry) yields the page. Returns 0 if the id is
+ * missing so a bad anchor degrades to the chapter start, not a crash.
+ */
+private fun anchorPageJs(anchor: String, currentPage: Int): String {
+    val escaped = anchor.replace("\\", "\\\\").replace("'", "\\'")
+    return """
+        (function() {
+          var el = document.getElementById('$escaped');
+          if (!el) return 0;
+          var vw = document.documentElement.clientWidth;
+          var x = el.getBoundingClientRect().left + ($currentPage * vw);
+          return Math.max(0, Math.floor(x / vw));
+        })()
+    """.trimIndent()
 }
 
 /**
@@ -346,7 +465,19 @@ private fun buildPaginateJs(trustedHeightPx: Int): String = """
         // is what actually stops images being sliced across a page break.
         'img,svg,video,table{max-width:' + colw + 'px !important;' +
         'max-height:' + contentH + 'px !important;width:auto !important;height:auto !important;' +
-        'break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;}';
+        'break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;}' +
+        // Real EPUBs commonly wrap figures in a container with its OWN
+        // hardcoded inline width (e.g. Project Gutenberg's
+        // <div class="figcenter" style="width: 550px;">) — capping the img
+        // alone still leaves that wider container spanning the column
+        // boundary, which is what a "split image" actually was. max-width
+        // as !important overrides a plain (non-!important) inline width
+        // regardless of specificity, and applies safely to every element
+        // since it's just an upper bound, not a fixed size.
+        'body *{max-width:' + colw + 'px !important;}' +
+        // Keep the image+caption block together where possible, same
+        // reasoning as break-inside:avoid on the image itself above.
+        'body :has(> img){break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;}';
       d.head.appendChild(s);
       // Re-read after styling: scrollWidth reflects the new column layout.
       window.__lrPageCount = Math.max(1, Math.ceil(d.body.scrollWidth / vw));

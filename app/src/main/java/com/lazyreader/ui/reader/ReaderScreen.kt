@@ -1,7 +1,10 @@
 package com.lazyreader.ui.reader
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -14,7 +17,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -22,10 +24,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
@@ -57,75 +63,74 @@ fun ReaderScreen(
         onDispose { view.keepScreenOn = false }
     }
 
+    // Content renders full-bleed (no Scaffold content inset) so the top bar
+    // and bottom indicator can float on top and auto-hide/reappear without
+    // resizing the pager underneath.
+    val (chromeVisible, pokeChrome) = rememberChromeVisibility()
+    var showJumpDialog by remember { mutableStateOf(false) }
+
     Box(modifier.fillMaxSize()) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text(displayName, maxLines = 1) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+        when {
+            uiState.errorMessage != null -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(uiState.errorMessage.orEmpty(), style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            uiState.isLoading || uiState.pageCount == 0 -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+            else -> {
+                val pagerState = rememberPagerState(initialPage = uiState.currentPage) { uiState.pageCount }
+
+                LaunchedEffect(pagerState) {
+                    snapshotFlow { pagerState.currentPage }
+                        .distinctUntilChanged()
+                        .collect { page ->
+                            viewModel.onPageChanged(page)
+                            pokeChrome()
                         }
-                    },
-                    actions = {
-                        VoiceMicAction(
-                            voiceActive = uiState.voiceActive,
-                            onStartVoice = viewModel::startVoiceControl,
-                            onStopVoice = viewModel::stopVoiceControl,
-                        )
-                    },
-                )
-            },
-        ) { padding ->
-            when {
-                uiState.errorMessage != null -> {
-                    Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                        Text(uiState.errorMessage.orEmpty(), style = MaterialTheme.typography.bodyLarge)
+                }
+
+                LaunchedEffect(pagerState) {
+                    viewModel.pageRequests.collect { page ->
+                        pagerState.animateScrollToPage(page)
                     }
                 }
-                uiState.isLoading || uiState.pageCount == 0 -> {
-                    Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                }
-                else -> {
-                    val pagerState = rememberPagerState(initialPage = uiState.currentPage) { uiState.pageCount }
 
-                    LaunchedEffect(pagerState) {
-                        snapshotFlow { pagerState.currentPage }
-                            .distinctUntilChanged()
-                            .collect { page -> viewModel.onPageChanged(page) }
-                    }
-
-                    LaunchedEffect(pagerState) {
-                        viewModel.pageRequests.collect { page ->
-                            pagerState.animateScrollToPage(page)
-                        }
-                    }
-
-                    Box(Modifier.fillMaxSize().padding(padding)) {
-                        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceVariant) {
-                                val bitmap = uiState.bitmaps[page]
-                                if (bitmap != null) {
-                                    Image(
-                                        bitmap = bitmap.asImageBitmap(),
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Fit,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                } else {
-                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        CircularProgressIndicator()
-                                    }
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) { detectTapGestures(onTap = { pokeChrome() }) },
+                ) {
+                    HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceVariant) {
+                            val bitmap = uiState.bitmaps[page]
+                            if (bitmap != null) {
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            } else {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator()
                                 }
                             }
                         }
+                    }
+
+                    AnimatedVisibility(
+                        visible = chromeVisible,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 16.dp),
+                    ) {
                         Surface(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 16.dp),
                             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                            modifier = Modifier.clickable { showJumpDialog = true },
                         ) {
                             Text(
                                 text = "${uiState.currentPage + 1} / ${uiState.pageCount}",
@@ -135,7 +140,42 @@ fun ReaderScreen(
                         }
                     }
                 }
+
+                if (showJumpDialog) {
+                    JumpToDialog(
+                        title = "Jump to page",
+                        itemLabel = "Page",
+                        currentIndex = uiState.currentPage,
+                        totalCount = uiState.pageCount,
+                        onJumpTo = viewModel::jumpToPage,
+                        onDismiss = { showJumpDialog = false },
+                    )
+                }
             }
+        }
+
+        // Kept reachable during loading/error (not gated on chromeVisible
+        // alone) so the back button never auto-hides before the user has
+        // had a chance to see it.
+        AnimatedVisibility(
+            visible = chromeVisible || uiState.isLoading || uiState.errorMessage != null,
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) {
+            TopAppBar(
+                title = { Text(displayName, maxLines = 1) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    VoiceMicAction(
+                        voiceActive = uiState.voiceActive,
+                        onStartVoice = viewModel::startVoiceControl,
+                        onStopVoice = viewModel::stopVoiceControl,
+                    )
+                },
+            )
         }
 
         if (uiState.locked) {

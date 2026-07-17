@@ -17,6 +17,22 @@ data class EpubBook(
     val title: String?,
     /** Absolute paths of the spine's XHTML documents, in reading order. */
     val chapterFiles: List<File>,
+    /**
+     * Real chapters from the book's nav TOC, in document order. Often finer-
+     * grained than [chapterFiles]: one spine file commonly packs many actual
+     * chapters (e.g. Project Gutenberg books). Empty if the book has no
+     * EPUB3 nav document.
+     */
+    val toc: List<TocEntry> = emptyList(),
+)
+
+/** One entry of the book's table of contents. */
+data class TocEntry(
+    val title: String,
+    /** Index into [EpubBook.chapterFiles] of the spine file holding this entry. */
+    val chapterIndex: Int,
+    /** Element id within that file to scroll to, or null for the file start. */
+    val anchor: String?,
 )
 
 /**
@@ -93,6 +109,7 @@ object EpubParser {
         var title: String? = null
         val manifest = mutableMapOf<String, String>() // id -> href
         val spineIdrefs = mutableListOf<String>()
+        var navHref: String? = null
 
         val parser = Xml.newPullParser().apply {
             setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true)
@@ -108,6 +125,9 @@ object EpubParser {
                         val id = parser.getAttributeValue(null, "id")
                         val href = parser.getAttributeValue(null, "href")
                         if (id != null && href != null) manifest[id] = href
+                        // EPUB3 marks the TOC document with properties="nav".
+                        val properties = parser.getAttributeValue(null, "properties")
+                        if (href != null && properties?.split(' ')?.contains("nav") == true) navHref = href
                     }
                     "itemref" -> {
                         parser.getAttributeValue(null, "idref")?.let { spineIdrefs.add(it) }
@@ -123,7 +143,76 @@ object EpubParser {
             }
         }
         if (chapters.isEmpty()) throw EpubFormatException("Spine has no readable chapters")
-        return EpubBook(title = title, chapterFiles = chapters)
+        val toc = navHref
+            ?.let { File(opfDir, Uri.decode(it)).takeIf(File::exists) }
+            ?.let { parseNavToc(it, chapters) }
+            .orEmpty()
+        return EpubBook(title = title, chapterFiles = chapters, toc = toc)
+    }
+
+    /**
+     * Reads the `<nav epub:type="toc">` section of the EPUB3 nav document into
+     * [TocEntry]s. Entries pointing at files that aren't in the spine (or at a
+     * missing file) are dropped. Best-effort: a malformed nav yields an empty
+     * list rather than failing the whole book.
+     */
+    private fun parseNavToc(navFile: File, chapters: List<File>): List<TocEntry> {
+        val chapterIndexByName = chapters.withIndex().associate { (i, f) -> f.name to i }
+        val entries = mutableListOf<TocEntry>()
+        try {
+            val parser = Xml.newPullParser().apply {
+                setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true)
+                setInput(FileInputStream(navFile), null)
+            }
+            var navDepth = 0
+            var inTocNav = false
+            var currentHref: String? = null
+            val currentText = StringBuilder()
+            while (parser.next() != XmlPullParser.END_DOCUMENT) {
+                when (parser.eventType) {
+                    XmlPullParser.START_TAG -> when (parser.name) {
+                        "nav" -> {
+                            if (!inTocNav) {
+                                // epub:type is namespaced; match any-namespace "type".
+                                val type = (0 until parser.attributeCount)
+                                    .firstOrNull { parser.getAttributeName(it) == "type" }
+                                    ?.let(parser::getAttributeValue)
+                                if (type == "toc") {
+                                    inTocNav = true
+                                    navDepth = 1
+                                }
+                            } else {
+                                navDepth++
+                            }
+                        }
+                        "a" -> if (inTocNav) {
+                            currentHref = parser.getAttributeValue(null, "href")
+                            currentText.clear()
+                        }
+                    }
+                    XmlPullParser.TEXT -> if (currentHref != null) currentText.append(parser.text)
+                    XmlPullParser.END_TAG -> when (parser.name) {
+                        "nav" -> if (inTocNav && --navDepth == 0) return entries
+                        "a" -> {
+                            val href = currentHref
+                            currentHref = null
+                            val label = currentText.toString().trim().replace(Regex("\\s+"), " ")
+                            if (href != null && label.isNotEmpty()) {
+                                val fileName = Uri.decode(href.substringBefore('#').substringAfterLast('/'))
+                                val anchor = href.substringAfter('#', "").ifEmpty { null }
+                                chapterIndexByName[fileName]?.let { index ->
+                                    entries.add(TocEntry(title = label, chapterIndex = index, anchor = anchor))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("EpubParser", "Failed to parse nav TOC, falling back to spine sections", e)
+            return emptyList()
+        }
+        return entries
     }
 }
 

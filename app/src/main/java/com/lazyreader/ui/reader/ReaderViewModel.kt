@@ -199,6 +199,13 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         _pageRequests.tryEmit(target)
     }
 
+    /** Jump directly to [page] from the "jump to page" slider dialog. */
+    fun jumpToPage(page: Int) {
+        val state = _uiState.value
+        val target = computeTargetPage(state.currentPage, state.pageCount, page - state.currentPage) ?: return
+        _pageRequests.tryEmit(target)
+    }
+
     private fun closeRendererLocked() {
         bitmapCache.values.forEach { it.recycle() }
         bitmapCache.clear()

@@ -34,6 +34,8 @@ object EpubFixture {
     fun validEpubEntries(
         title: String = "Test Book",
         chapterTexts: List<String> = listOf("Chapter One", "Chapter Two"),
+        /** (title, chapterFileNumber 1-based, anchor?) — adds an EPUB3 nav doc when non-empty. */
+        tocEntries: List<Triple<String, Int, String?>> = emptyList(),
     ): Map<String, ByteArray> {
         val containerXml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
             "<container version=\"1.0\" xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">\n" +
@@ -41,8 +43,12 @@ object EpubFixture {
             "media-type=\"application/oebps-package+xml\"/></rootfiles>\n" +
             "</container>"
 
-        val manifestItems = chapterTexts.indices.joinToString("\n") { i ->
+        var manifestItems = chapterTexts.indices.joinToString("\n") { i ->
             "<item id=\"chap${i + 1}\" href=\"chapter${i + 1}.xhtml\" media-type=\"application/xhtml+xml\"/>"
+        }
+        if (tocEntries.isNotEmpty()) {
+            manifestItems += "\n<item id=\"nav\" href=\"nav.xhtml\" " +
+                "media-type=\"application/xhtml+xml\" properties=\"nav\"/>"
         }
         val spineItems = chapterTexts.indices.joinToString("\n") { i ->
             "<itemref idref=\"chap${i + 1}\"/>"
@@ -62,6 +68,19 @@ object EpubFixture {
             entries["OEBPS/chapter${i + 1}.xhtml"] = (
                 "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
                     "<html xmlns=\"http://www.w3.org/1999/xhtml\"><body><p>$text</p></body></html>"
+                ).toByteArray()
+        }
+        if (tocEntries.isNotEmpty()) {
+            val lis = tocEntries.joinToString("\n") { (label, fileNum, anchor) ->
+                val href = "chapter$fileNum.xhtml" + (anchor?.let { "#$it" } ?: "")
+                "<li><a href=\"$href\">$label</a></li>"
+            }
+            entries["OEBPS/nav.xhtml"] = (
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                    "<html xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:epub=\"http://www.idpf.org/2007/ops\">" +
+                    "<head><title>TOC</title></head><body>" +
+                    "<nav epub:type=\"toc\"><ol>\n$lis\n</ol></nav>" +
+                    "</body></html>"
                 ).toByteArray()
         }
         return entries

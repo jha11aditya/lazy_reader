@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.lazyreader.data.AppDatabase
 import com.lazyreader.epub.EpubBook
 import com.lazyreader.epub.EpubParser
+import com.lazyreader.epub.TocEntry
 import com.lazyreader.voice.VoiceCommand
 import com.lazyreader.voice.VoiceCommandClassifier
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +29,13 @@ data class EpubReaderUiState(
     val chapterUrl: String? = null,
     /** True when this chapter was entered by paging backward — open at its last page. */
     val openAtLastPage: Boolean = false,
+    /** Real chapters from the book's nav TOC; empty when the book ships none. */
+    val toc: List<TocEntry> = emptyList(),
+    /**
+     * Element id to scroll to after the current chapter file paginates —
+     * set by a TOC jump, consumed (cleared) by the screen once honored.
+     */
+    val pendingAnchor: String? = null,
     val voiceActive: Boolean = false,
     val locked: Boolean = false,
 )
@@ -67,6 +75,7 @@ class EpubReaderViewModel(application: Application) : AndroidViewModel(applicati
                     // Uri.fromFile: proper file:// form + percent-encoding (File.toURI
                     // yields single-slash file:/ URLs WebView handles inconsistently).
                     chapterUrl = Uri.fromFile(parsed.chapterFiles[chapter]).toString(),
+                    toc = parsed.toc,
                 )
             } catch (e: Exception) {
                 openUri = null
@@ -82,6 +91,25 @@ class EpubReaderViewModel(application: Application) : AndroidViewModel(applicati
 
     fun previousChapter() = goToChapter(_uiState.value.chapterIndex - 1, openAtLastPage = true)
 
+    /** Jump directly to [index] from the "jump to chapter" slider dialog. */
+    fun jumpToChapter(index: Int) = goToChapter(index, openAtLastPage = false)
+
+    /**
+     * Jump to a real TOC chapter: switch to its spine file and remember its
+     * anchor so the screen can scroll to the right page after pagination.
+     * Works for same-file jumps too — chapterUrl doesn't change then, so the
+     * screen reacts to [EpubReaderUiState.pendingAnchor] directly.
+     */
+    fun jumpToTocEntry(entry: TocEntry) {
+        goToChapter(entry.chapterIndex, openAtLastPage = false)
+        _uiState.update { it.copy(pendingAnchor = entry.anchor) }
+    }
+
+    /** Called by the screen once [EpubReaderUiState.pendingAnchor] has been honored. */
+    fun clearPendingAnchor() {
+        _uiState.update { it.copy(pendingAnchor = null) }
+    }
+
     private fun goToChapter(index: Int, openAtLastPage: Boolean) {
         val chapters = book?.chapterFiles ?: return
         if (index !in chapters.indices) return
@@ -90,6 +118,7 @@ class EpubReaderViewModel(application: Application) : AndroidViewModel(applicati
                 chapterIndex = index,
                 chapterUrl = Uri.fromFile(chapters[index]).toString(),
                 openAtLastPage = openAtLastPage,
+                pendingAnchor = null,
             )
         }
         persistProgress(index)

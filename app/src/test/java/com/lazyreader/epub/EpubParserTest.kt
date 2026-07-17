@@ -72,6 +72,39 @@ class EpubParserTest {
     }
 
     @Test
+    fun `nav toc parses titles anchors and chapter indices`() {
+        val entries = EpubFixture.validEpubEntries(
+            chapterTexts = listOf("One", "Two"),
+            tocEntries = listOf(
+                Triple("Chapter I", 1, "ch1"),
+                Triple("Chapter II", 1, "ch2"),
+                Triple("Chapter III", 2, null),
+            ),
+        )
+        val epub = EpubFixture.zipOf(tempFolder.newFile("toc.epub"), entries)
+
+        val book = EpubParser.open(context, Uri.fromFile(epub))
+
+        assertEquals(
+            listOf(
+                TocEntry("Chapter I", 0, "ch1"),
+                TocEntry("Chapter II", 0, "ch2"),
+                TocEntry("Chapter III", 1, null),
+            ),
+            book.toc,
+        )
+    }
+
+    @Test
+    fun `book without nav doc yields empty toc`() {
+        val epub = EpubFixture.writeValidEpub(tempFolder.newFile("no-toc.epub"))
+
+        val book = EpubParser.open(context, Uri.fromFile(epub))
+
+        assertEquals(emptyList<TocEntry>(), book.toc)
+    }
+
+    @Test
     fun `re-opening the same uri is idempotent`() {
         val epub = EpubFixture.writeValidEpub(tempFolder.newFile("reopen.epub"))
         val uri = Uri.fromFile(epub)
