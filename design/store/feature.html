@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1024px; height: 500px; overflow: hidden; }
+  .stage {
+    position: relative; width: 1024px; height: 500px;
+    background-image: url('file:///home/adi/Documents/apps/lazy_reader/app/src/main/res/drawable-nodpi/dashboard_background.jpg');
+    background-size: cover; background-position: center 40%;
+  }
+  /* Darken toward forest green so the wordmark always clears the moss detail. */
+  .veil {
+    position: absolute; inset: 0;
+    background:
+      linear-gradient(90deg, rgba(12,26,15,.92) 0%, rgba(16,38,22,.80) 46%, rgba(20,48,28,.55) 100%),
+      rgba(30,77,43,.30);
+  }
+  .content {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: center;
+    /* Play crops the edges in some placements — keep everything well inset. */
+    padding: 0 92px;
+  }
+  .word {
+    font-family: Georgia, 'DejaVu Serif', serif;
+    font-style: italic; font-weight: 700;
+    font-size: 92px; line-height: 1;
+    color: #fff; letter-spacing: .012em;
+    text-shadow: 0 3px 16px rgba(0,0,0,.55);
+  }
+  .rule {
+    width: 108px; height: 5px; border-radius: 3px;
+    background: #C98A5B; margin: 22px 0 20px;
+  }
+  .tag {
+    font-family: 'DejaVu Sans', Ubuntu, sans-serif;
+    font-size: 31px; font-weight: 600; color: #F0EDE4;
+    letter-spacing: .005em; text-shadow: 0 2px 10px rgba(0,0,0,.6);
+  }
+  .sub {
+    font-family: 'DejaVu Sans', Ubuntu, sans-serif;
+    font-size: 21px; color: #C7D6C2; margin-top: 13px;
+    letter-spacing: .02em;
+  }
+  .chips { display: flex; gap: 11px; margin-top: 26px; }
+  .chip {
+    font-family: 'DejaVu Sans', Ubuntu, sans-serif;
+    font-size: 16px; font-weight: 600; color: #EAF2E6;
+    border: 1.5px solid rgba(201,138,91,.85);
+    border-radius: 999px; padding: 8px 17px;
+    background: rgba(0,0,0,.26);
+    letter-spacing: .01em;
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="veil"></div>
+    <div class="content">
+      <div class="word">Lazy Reader</div>
+      <div class="rule"></div>
+      <div class="tag">Read hands-free. Completely offline.</div>
+      <div class="sub">Say “go” to turn the page — your book never leaves your phone.</div>
+      <div class="chips">
+        <div class="chip">PDF &amp; EPUB</div>
+        <div class="chip">No internet permission</div>
+        <div class="chip">No ads, no tracking</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
