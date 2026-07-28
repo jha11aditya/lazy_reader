@@ -75,6 +75,24 @@ Free, and built to stay out of your way.
 
 ---
 
+## Release notes — v1.0, versionCode 1 (max 500 per language)
+
+Goes in the "Release notes" field on the release page, between the
+`<en-US>` tags Play pre-fills.
+
+```
+First release of Lazy Reader.
+
+Read PDFs and EPUBs hands-free — say "go" to turn the page, "backward" to go
+back, and "stop" to switch listening off and lock the screen.
+
+Everything happens on your phone. The app has no internet permission at all,
+so nothing you read or say can leave your device.
+```
+*(287 characters)*
+
+---
+
 ## Data safety form answers
 
 | Question | Answer |
@@ -113,7 +131,7 @@ blocked by the operating system.
 
 | Asset | Requirement | Status |
 |---|---|---|
-| App icon | 512×512 PNG, 32-bit | ⬜ export from adaptive vector |
+| App icon | 512×512 PNG, 32-bit | ✅ `play_icon_512.png` |
 | Feature graphic | 1024×500 | ✅ `feature_graphic.png` |
 | Phone screenshots | 2–8, ratio ≤ 2:1 | ✅ `01`–`05` at 800×1400 |
 | Privacy policy URL | public | ✅ live |
