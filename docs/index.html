@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lazy Reader — Privacy Policy</title>
+<style>
+  :root {
+    --ink: #1f2420;
+    --muted: #5b665c;
+    --forest: #1e5631;
+    --rule: #d8e0d8;
+    --bg: #ffffff;
+    --card: #f5f8f4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #e8ece7; --muted: #a3b0a4; --forest: #7bbd8c;
+      --rule: #2c3630; --bg: #141815; --card: #1c221d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2.5rem 1.25rem 4rem;
+    background: var(--bg); color: var(--ink);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; }
+  h1 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-style: italic; font-weight: 600;
+    color: var(--forest); font-size: 2.4rem;
+    margin: 0 0 .2rem; letter-spacing: .01em;
+  }
+  .sub { color: var(--muted); margin: 0 0 .9rem; font-size: 1.05rem; }
+  .rule { height: 3px; background: var(--forest); border-radius: 2px; width: 5.5rem; margin-bottom: 2rem; }
+  h2 {
+    font-size: 1.12rem; margin: 2.2rem 0 .6rem;
+    color: var(--forest); letter-spacing: .005em;
+  }
+  p { margin: 0 0 1rem; }
+  ul { margin: 0 0 1rem; padding-left: 1.25rem; }
+  li { margin-bottom: .45rem; }
+  a { color: var(--forest); }
+  .callout {
+    background: var(--card); border-left: 4px solid var(--forest);
+    padding: 1rem 1.15rem; border-radius: 6px; margin: 0 0 1.6rem;
+  }
+  .callout p { margin: 0; }
+  code {
+    background: var(--card); padding: .12em .4em;
+    border-radius: 4px; font-size: .9em;
+  }
+  footer {
+    margin-top: 3rem; padding-top: 1.2rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted); font-size: .92rem;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Lazy Reader</h1>
+  <p class="sub">Privacy Policy</p>
+  <div class="rule"></div>
+
+  <div class="callout">
+    <p><strong>Lazy Reader collects no data whatsoever.</strong> It has no analytics, no advertising, no accounts, and no way to send information anywhere — the app is not granted internet access by the operating system.</p>
+  </div>
+
+  <p>Lazy Reader is an offline document reader for Android that lets you turn pages using your voice. This policy explains exactly what the app does and does not do with your information. It is short because the app does very little.</p>
+
+  <h2>No internet access</h2>
+  <p>Lazy Reader does not request the <code>INTERNET</code> permission. This is enforced by Android itself, not merely promised here: without that permission the operating system blocks the app from opening any network connection. Nothing you read, say, or store can leave your device through the app.</p>
+
+  <h2>Microphone</h2>
+  <p>The app requests one permission: <code>RECORD_AUDIO</code>. It is used solely to recognise three spoken commands — “go”, “backward”, and “stop” — so you can turn pages hands-free.</p>
+  <ul>
+    <li>Audio is analysed entirely on your device, by a small speech model bundled inside the app.</li>
+    <li>Audio is held briefly in memory for recognition and then discarded. It is never written to storage.</li>
+    <li>No recordings, transcripts, or derived audio data are created, retained, or transmitted.</li>
+    <li>The microphone is active only while you are reading with voice control switched on, and stops when you say “stop”, leave the reader, or close the app.</li>
+  </ul>
+
+  <h2>Your documents</h2>
+  <p>Documents you open stay on your device. The app keeps a small private list of recently opened books so it can show your reading progress. For each book it stores only:</p>
+  <ul>
+    <li>the file reference and display name,</li>
+    <li>the current page and total page count,</li>
+    <li>the time you last opened it.</li>
+  </ul>
+  <p>EPUB files are unpacked into the app’s own private storage area so their chapters can be displayed. All of this data lives in private app storage that other apps cannot read, and it is permanently deleted when you uninstall Lazy Reader.</p>
+
+  <h2>No third parties</h2>
+  <p>Lazy Reader contains no advertising networks, no analytics or crash-reporting services, and no social media integrations. No third party receives any information about you or your reading.</p>
+
+  <h2>Children</h2>
+  <p>Lazy Reader is suitable for all ages. Because it collects no data at all, it collects no data from children.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>If this policy changes, the updated version will be published at this address with a revised date below. Any change that affected how data is handled would also require an app update, since the app’s behaviour is fixed in its code.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about this policy or the app are welcome:<br>
+  Aditya Kumar — <a href="mailto:ansuloco@gmail.com">ansuloco@gmail.com</a></p>
+
+  <footer>
+    Last updated 28 July 2026 · Lazy Reader for Android
+  </footer>
+
+</div>
+</body>
+</html>
